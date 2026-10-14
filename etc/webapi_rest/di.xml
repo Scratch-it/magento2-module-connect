@@ -5,7 +5,8 @@
  */
 -->
 <!-- REST API only: the storefront, checkout and Admin never run these plugins. -->
-<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
     <type name="Magento\Sales\Api\OrderRepositoryInterface">
         <plugin name="zembula_connect_order_parent_sku" type="Zembula\Connect\Plugin\OrderParentSku"/>
     </type>

@@ -4,7 +4,8 @@
  * Copyright (c) Zembula. Licensed under the MIT License; see LICENSE.
  */
 -->
-<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:Api/etc/extension_attributes.xsd">
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:Api/etc/extension_attributes.xsd">
     <!-- Order lines: the current SKU of the configurable product the line was bought through. -->
     <extension_attributes for="Magento\Sales\Api\Data\OrderItemInterface">
         <attribute code="zembula_parent_sku" type="string"/>

@@ -12,7 +12,8 @@
     Magento adds each resource's parents itself and silently skips resources the store does not have
     (for example Stocks on a store without Magento Inventory / MSI).
 -->
-<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Integration:etc/integration/integration_file.xsd">
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Integration:etc/integration/integration_file.xsd">
     <integration name="Zembula">
         <email>integrations@zembula.example</email>
         <endpoint_url>https://www-ssl.scratch-it.com/integrations/magento/callback</endpoint_url>

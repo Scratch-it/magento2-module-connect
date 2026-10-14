@@ -4,7 +4,8 @@
  * Copyright (c) Zembula. Licensed under the MIT License; see LICENSE.
  */
 -->
-<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:Module/etc/module.xsd">
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:Module/etc/module.xsd">
     <module name="Zembula_Connect">
         <sequence>
             <module name="Magento_Catalog"/>
