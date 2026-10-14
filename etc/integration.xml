@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * Copyright (c) Zembula. Licensed under the MIT License; see LICENSE.
+ */
+-->
+<!--
+    Every value below is frozen. If the email, either URL or the resource list changes, the next
+    setup:upgrade deletes and re-creates this integration with new credentials, and the store has to
+    click Activate again (Magento\Integration\Model\ConfigBasedIntegrationManager::hasDataChanged).
+
+    Magento adds each resource's parents itself and silently skips resources the store does not have
+    (for example Stocks on a store without Magento Inventory / MSI).
+-->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Integration:etc/integration/integration_file.xsd">
+    <integration name="Zembula">
+        <email>integrations@zembula.example</email>
+        <endpoint_url>https://www-ssl.scratch-it.com/integrations/magento/callback</endpoint_url>
+        <identity_link_url>https://www-ssl.scratch-it.com/customers/integrations/magento/link</identity_link_url>
+        <resources>
+            <!-- Catalog > Inventory > Products -->
+            <resource name="Magento_Catalog::products"/>
+            <!-- Catalog > Inventory > Categories -->
+            <resource name="Magento_Catalog::categories"/>
+            <!-- Sales > Operations > Orders > Actions > View -->
+            <resource name="Magento_Sales::actions_view"/>
+            <!-- Sales > Operations > Shipments -->
+            <resource name="Magento_Sales::shipment"/>
+            <!-- Stores > Settings > All Stores -->
+            <resource name="Magento_Backend::store"/>
+            <!-- Stores > Inventory > Stocks (Magento Inventory / MSI) -->
+            <resource name="Magento_InventoryApi::stock"/>
+            <!-- Marketing > Promotions > Cart Price Rules: read rules, create coupon codes -->
+            <resource name="Magento_SalesRule::quote"/>
+        </resources>
+    </integration>
+</config>
