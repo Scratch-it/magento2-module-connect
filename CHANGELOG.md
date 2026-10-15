@@ -2,7 +2,7 @@
 
 All notable changes to this module are recorded here. Versions follow [Semantic Versioning](https://semver.org/).
 
-## [1.0.0] - Unreleased
+## [1.0.0] - 2026-10-15
 
 ### Added
 
