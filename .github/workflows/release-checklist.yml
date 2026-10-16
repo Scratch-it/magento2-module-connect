@@ -1,0 +1,222 @@
+name: Release Checklist
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize, ready_for_review]
+    # This repo has no separate production branch: every PR into its one
+    # long-lived branch is the release unit (SDLC SOP §5). Substitute this
+    # repo's actual default branch - see perRepoReleaseScope. Listed here as
+    # an example; the five "trunk" repos use main (zmbl-stream, tinybird,
+    # AwsCloudWatchKinesisFirehose, catalog-image-processor) or master
+    # (optimize-lambda). A trigger-level filter fails CLOSED (a misconfigured
+    # or renamed branch leaves the required check pending, never green) -
+    # unlike a job-level `if`, where a skipped job reports "Success" and
+    # satisfies a required check by itself. See skraphaugIf for the
+    # prod-only variant (skraphaug, dynamic).
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  release-checklist:
+    name: Release Checklist
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Validate Release Checklist
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          python3 - <<'PYEOF'
+          import os
+          import re
+          import sys
+
+          FENCE_OPEN = re.compile(r"^ {0,3}(`{3,}|~{3,})(.*)$")
+          CODE_SPAN = re.compile(r"(`+)(?:(?!\1).)+?\1")
+          # A real ATX heading needs a space/tab (or end of line) after the hashes,
+          # so "#2810 follow-up" or "#hotfix" at the start of a line is plain text.
+          # The description runs to the next level-2 heading (the template's next
+          # section), so its own "# Title" or "### Notes" headings stay inside it.
+          H2 = re.compile(r"^ {0,3}##(?:[ \t]|$)", re.MULTILINE)
+          ANY_HEADING = re.compile(r"^ {0,3}#{1,6}(?:[ \t]|$)", re.MULTILINE)
+
+
+          def strip_closed_comments(s):
+              """Remove each closed <!-- ... --> (linear scan, no regex backtracking)."""
+              out, i = [], 0
+              while True:
+                  a = s.find("<!--", i)
+                  b = s.find("-->", a + 2) if a >= 0 else -1
+                  if b < 0:
+                      out.append(s[i:])
+                      return "".join(out)
+                  out.append(s[i:a])
+                  i = b + 3
+
+
+          def drop_comments(line):
+              """Remove closed <!-- ... --> comments outside inline code spans."""
+              out, i = [], 0
+              for m in CODE_SPAN.finditer(line):
+                  out.append(strip_closed_comments(line[i:m.start()]))
+                  out.append(m.group(0))
+                  i = m.end()
+              out.append(strip_closed_comments(line[i:]))
+              return "".join(out)
+
+
+          def render(text):
+              """Walk the body line by line the way GitHub's markdown parser sees its
+              blocks. Returns (struct, visible):
+                struct  - headings/ticks/text outside code; a fenced block or code span
+                          becomes "[code]" so its contents never look like a heading or
+                          a tick, but still count as description text;
+                visible - everything that renders (code kept verbatim), for the Monday
+                          link search.
+              HTML comments render as nothing in both. An unclosed "<!--" hides the
+              rest of the body only where CommonMark says so: at the start of a line.
+              Inside code (fenced or `inline`) "<!--" is literal text."""
+              struct, visible = [], []
+              fence = None          # (char, min length) while inside a fenced code block
+              in_comment = False    # inside a multi-line <!-- ... --> HTML block
+              for line in text.split("\n"):
+                  if fence:
+                      visible.append(line)
+                      if re.match(r"^ {0,3}%s{%d,}[ \t]*$" % (re.escape(fence[0]), fence[1]), line):
+                          fence = None
+                      continue
+                  if in_comment:
+                      if "-->" not in line:
+                          continue
+                      in_comment = False
+                      line = line.split("-->", 1)[1]
+                  m = FENCE_OPEN.match(line)
+                  if m and not (m.group(1)[0] == "`" and "`" in m.group(2)):
+                      fence = (m.group(1)[0], len(m.group(1)))
+                      struct.append("[code]")
+                      visible.append(line)
+                      continue
+                  line = drop_comments(line)
+                  if re.match(r"^ {0,3}<!--", line):
+                      in_comment = True
+                      continue
+                  visible.append(line)
+                  struct.append(CODE_SPAN.sub("[code]", line))
+              return "\n".join(struct), "\n".join(visible)
+
+
+          def section(heading_pattern, text, stop):
+              """Text between a heading matching heading_pattern and the next line
+              matching stop, or None if the heading isn't present."""
+              m = re.search(heading_pattern, text, re.IGNORECASE | re.MULTILINE)
+              if not m:
+                  return None
+              nxt = stop.search(text, m.end())
+              return text[m.end():nxt.start() if nxt else len(text)]
+
+
+          body = os.environ.get("PR_BODY") or ""
+          # Normalize CRLF/CR (web UI bodies) to LF before matching line anchors.
+          body = body.replace("\r\n", "\n").replace("\r", "\n")
+          # Zero-width characters are invisible, not "real text".
+          body = re.sub("[\u200b-\u200d\u2060\ufeff]", "", body)
+          struct, visible = render(body)
+
+          errors = []
+
+          # 1. "Description of the change" has real text: at least one letter or
+          #    digit once the template placeholder is removed (a leftover ">", a rule
+          #    or whitespace renders as nothing).
+          desc = section(r"^ {0,3}##\s*Description of the change\s*#*\s*$", struct, H2)
+          if desc is None:
+              errors.append(
+                  'Missing "## Description of the change" section - this PR '
+                  "description was not started from the repository's pull "
+                  "request template. Edit the PR description to include that "
+                  "section; this check re-runs automatically."
+              )
+          elif not re.search(
+              r"[^\W_]", re.sub(r"description here", "", desc, flags=re.IGNORECASE)
+          ):
+              errors.append(
+                  'The "Description of the change" section is empty, or '
+                  'still has the template placeholder "> Description '
+                  'here". Edit the PR description and replace it with a '
+                  "real description of the change; this check re-runs "
+                  "automatically when the description is edited."
+              )
+
+          # 2. At least one "Type of change" box is ticked. (Not every box -
+          #    an unticked box is honest and is not an error.)
+          type_section = section(r"^ {0,3}##\s*Type of change\s*#*\s*$", struct, ANY_HEADING)
+          if type_section is None:
+              errors.append(
+                  'Missing "## Type of change" section - this PR description '
+                  "was not started from the repository's pull request "
+                  "template. Edit the PR description to include that "
+                  "section; this check re-runs automatically."
+              )
+          elif not re.search(
+              r"^[ \t]*(?:[-*+]|\d+[.)])[ \t]+\[[xX]\]", type_section, re.MULTILINE
+          ):
+              errors.append(
+                  'No box is ticked under "## Type of change". Edit the PR '
+                  'description and tick at least one box (change "- [ ]" to '
+                  '"- [x]") for the kind of change this is; this check '
+                  "re-runs automatically when the description is edited."
+              )
+
+          # 3. A Monday task is linked: a monday.com URL with a real numeric
+          #    pulse id, anywhere visible in the body (not the template's "<id>").
+          if not re.search(
+              r"(?<![\w./-])(?:https?://)?(?:[a-z0-9-]+\.)*monday\.com/boards/\d+"
+              r"(?:/views/\d+)?/pulses/\d+",
+              visible,
+              re.IGNORECASE,
+          ):
+              errors.append(
+                  "No linked Monday task found. Edit the PR description to "
+                  "add a monday.com task link with a real numeric pulse id "
+                  "(for example https://zembula-team.monday.com/boards/"
+                  "2942742679/pulses/123456) - the template's \"<id>\" "
+                  "placeholder does not count. This check re-runs "
+                  "automatically when the description is edited."
+              )
+
+          # 4. The "Development" and "Code review" checklist sections are
+          #    present, i.e. the template was used.
+          if not re.search(r"^ {0,3}###\s*Development\b.*$", struct, re.IGNORECASE | re.MULTILINE):
+              errors.append(
+                  'Missing "### Development" checklist section - this PR '
+                  "description was not started from the repository's pull "
+                  "request template. Edit the PR description to include "
+                  "that section; this check re-runs automatically."
+              )
+          if not re.search(r"^ {0,3}###\s*Code review\b.*$", struct, re.IGNORECASE | re.MULTILINE):
+              errors.append(
+                  'Missing "### Code review" checklist section - this PR '
+                  "description was not started from the repository's pull "
+                  "request template. Edit the PR description to include "
+                  "that section; this check re-runs automatically."
+              )
+
+          if errors:
+              for message in errors:
+                  print(f"::error::{message}")
+              print(
+                  "::notice::Edit the PR description to fix the item(s) "
+                  "above - this check re-runs automatically. Using "
+                  "\"Re-run jobs\" in the Actions tab replays the OLD "
+                  "description and will not pick this up; edit the "
+                  "description instead."
+              )
+              sys.exit(1)
+
+          print(
+              "Release Checklist OK: description, a ticked type of change, "
+              "a linked Monday task, and the Development/Code review "
+              "sections are all present."
+          )
+          PYEOF

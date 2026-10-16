@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * Copyright (c) Zembula. Licensed under the MIT License; see LICENSE.
+ */
+-->
+<!-- REST API only: the storefront, checkout and Admin never run these plugins. -->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+    <type name="Magento\Sales\Api\OrderRepositoryInterface">
+        <plugin name="zembula_connect_order_parent_sku" type="Zembula\Connect\Plugin\OrderParentSku"/>
+    </type>
+    <type name="Magento\Catalog\Api\ProductRepositoryInterface">
+        <plugin name="zembula_connect_product_parent_skus" type="Zembula\Connect\Plugin\ProductParentSkus"/>
+    </type>
+</config>

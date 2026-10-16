@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # composer.json keeps its "version" field (Adobe Commerce Marketplace
+      # requires it), so that one warning is switched off. It must match the tag.
+      - name: Validate composer.json
+        run: composer validate --strict --no-check-version
+
+      - name: PHP syntax
+        run: find . -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
+
+      # Installed outside the checkout so the module itself has no dev dependencies.
+      # The dealerdirect plugin registers the standard with phpcs.
+      - name: Install the Magento Coding Standard
+        run: |
+          mkdir -p "$RUNNER_TEMP/mcs"
+          echo '{"config":{"allow-plugins":{"dealerdirect/phpcodesniffer-composer-installer":true}}}' > "$RUNNER_TEMP/mcs/composer.json"
+          composer require --working-dir="$RUNNER_TEMP/mcs" --no-interaction --no-progress "magento/magento-coding-standard:^41"
+          "$RUNNER_TEMP/mcs/vendor/bin/phpcs" -i
+
+      # Severity 10 is the level Adobe Commerce Marketplace enforces.
+      - name: phpcs (Magento2, severity 10)
+        run: '"$RUNNER_TEMP/mcs/vendor/bin/phpcs" --standard=Magento2 --severity=10 --extensions=php,phtml,xml --ignore=vendor .'
